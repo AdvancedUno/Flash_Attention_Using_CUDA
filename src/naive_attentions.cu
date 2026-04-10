@@ -5,7 +5,10 @@
 
 // S = Q @ K^T / sqrt(d)
 #define BLOCK 16
+
+// For softmax, I just decided to use 1D blocks since we are processing one row at a time
 #define BLOCK_1D 256
+
 
 __global__ void compute_scores_kernel(const float* Q, const float* K, float*  S, int N, int d
 ) {
@@ -39,35 +42,32 @@ __global__ void softmax_kernel(const float* S,float* P,int N) {
         return;
     }
 
-    const float* row_ptr = S + row * N;
-    float* out_ptr = P + row * N;
-
     // find row max
     float max_val = -FLT_MAX;
     for (int j = 0; j < N; j++)
     {
-        max_val = fmaxf(max_val, row_ptr[j]);
+        max_val = fmaxf(max_val, S[row * N + j]);
     }
 
     // compute exp and accumulate sum
     float sum = 0.0f;
     for (int j = 0; j < N; j++) 
     {
-        out_ptr[j] = expf(row_ptr[j] - max_val);
-        sum += out_ptr[j];
+        P[row * N + j] = expf(S[row * N + j] - max_val);
+        sum += P[row * N + j];
     }
 
-    // Pass 3: normalize
+    // Normalize but the sum is 1
     for (int j = 0; j < N; j++)
     {
-        out_ptr[j] /= sum;
+        P[row * N + j] /= sum;
     }
 }
 
 
-// Kernel 3: Output O = P @ V
-__global__ void compute_output_kernel(const float* P, const float* V, float* O, int N, int d
-) {
+// Output O = P @ V
+__global__ void compute_output_kernel(const float* P, const float* V, float* O, int N, int d) {
+
     int row = blockIdx.y * blockDim.y + threadIdx.y;
     int col = blockIdx.x * blockDim.x + threadIdx.x;
 
@@ -82,6 +82,7 @@ __global__ void compute_output_kernel(const float* P, const float* V, float* O, 
         sum += P[row * N + j] * V[j * d + col];
     }
 
+    // This is Nxd of attention output with wegith
     O[row * d + col] = sum;
 }
 
@@ -93,6 +94,7 @@ void naive_attention(const float* d_Q, const float* d_K, const float* d_V, float
     cudaMalloc(&d_S, N * N * sizeof(float));
     cudaMalloc(&d_P, N * N * sizeof(float));
 
+    // For the timeing of kernels
     cudaEvent_t start, stop;
 
     cudaEventCreate(&start);

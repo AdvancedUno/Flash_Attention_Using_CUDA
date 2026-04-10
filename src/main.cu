@@ -52,7 +52,7 @@ void run_naive(int N, int d) {
     }
 
 
-    // Timed runs
+    // This is when to check time
     float total_ms = 0.0f;
     for (int i = 0; i < TIMED_RUNS; i++) {
         float t;
@@ -68,6 +68,7 @@ void run_naive(int N, int d) {
 
 
 
+    // Clean ups
     free(h_Q); 
     free(h_K); 
     free(h_V);
