@@ -8,7 +8,7 @@
 void random_fill(float* mat, int rows, int cols) {
     for (int i = 0; i < rows * cols; i++)
     {
-        mat[i] = (float) rand();
+        mat[i] = (float) rand()/(RAND_MAX + 1.0f);
     }  
 }
 
