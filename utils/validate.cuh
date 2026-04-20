@@ -61,3 +61,40 @@ void cpu_attention(float* Q, float* K, float* V, float* O, int N, int d) {
 
     free(S);
 }
+
+
+inline float max_abs_error(float* A, float* B, int N, int d) {
+    float max_err = 0.0f;
+    for (int i = 0; i < N * d; i++)
+    {
+        max_err = fmaxf(max_err, fabsf(A[i] - B[i]));
+    }
+        
+    return max_err;
+}
+
+// Returns average absolute error
+inline float avg_abs_error(float* A, float* B, int N, int d) {
+
+    float total = 0.0f;
+
+    for (int i = 0; i < N * d; i++)
+    {
+        total += fabsf(A[i] - B[i]);
+    }   
+    
+    return total / (N * d);
+}
+
+// Print pass or fail with error values
+inline bool check_correctness(float* O_gpu, float* O_ref,int N, int d, const char* kernel_name, float threshold = 1e-3f) {
+
+    float max_err = max_abs_error(O_gpu, O_ref, N, d);
+    float avg_err = avg_abs_error(O_gpu, O_ref, N, d);
+
+    bool pass = max_err < threshold;
+
+    printf("[%s] Max error: %.6f | Avg error: %.6f | %s\n", kernel_name, max_err, avg_err, pass ? "PASS" : "FAIL");
+
+    return pass;
+}
