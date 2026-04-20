@@ -27,7 +27,6 @@ add_executable(flash_attention
     src/main.cu
     src/naive_attentions.cu
     src/flash_attention.cu
-    src/flash_attention_opt.cu
 )
 
 

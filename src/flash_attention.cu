@@ -13,7 +13,17 @@ __global__ void flash_attention_kernel(const float* Q, const float* K, const flo
     // shared memory for K and V tiles
     __shared__ float K_tile[TILE_SIZE][D_MAX];
     __shared__ float V_tile[TILE_SIZE][D_MAX];
-    __shared__ float Q_tile[TILE_SIZE][D_MAX];
+
+
+    float q_reg[D_MAX] = {};
+    if (q_row < N)
+    {
+        for (int i = 0; i < d; i++)
+        {
+        	q_reg[i] = Q[q_row * d + i];
+        }
+    }
+
 
 
     float O_acc[D_MAX] = {};
@@ -26,26 +36,10 @@ __global__ void flash_attention_kernel(const float* Q, const float* K, const flo
     int num_tiles = (N + TILE_SIZE - 1) / TILE_SIZE;
 
 
-    if (q_row < N) 
-    {
-        for (int i = 0; i < d; i++)
-        {
-            Q_tile[threadIdx.x][i] = Q[q_row * d + i];
-        }
-    } 
-    else 
-    {
-        for (int i = 0; i < d; i++)
-        {
-            Q_tile[threadIdx.x][i] = 0.0f;
-        }
-    }
-
-    __syncthreads();
 
     for (int tile = 0; tile < num_tiles; tile++) {
 
-        int kv_row = tile * TILE_SIZE; + threadIdx.x;
+        int kv_row = tile * TILE_SIZE + threadIdx.x;
 
         if (threadIdx.x < TILE_SIZE && kv_row < N) 
         {
@@ -98,7 +92,7 @@ __global__ void flash_attention_kernel(const float* Q, const float* K, const flo
                 float dot = 0.0f;
                 for (int i = 0; i < d; i++)
                 {
-                    dot += Q_tile[threadIdx.x][i] * K_tile[j][i];
+                	dot += q_reg[i] * K_tile[j][i];
                 }
                 
                 scores[j] = dot * scale;

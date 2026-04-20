@@ -11,6 +11,8 @@
 #define WARMUP_RUNS 3
 #define TIMED_RUNS 10
 
+typedef void (*AttnFn)(const float*, const float*, const float*, float*, int, int, float*);
+
 float benchmark(AttnFn fn, const float* d_Q, const float* d_K, const float* d_V, float* d_O, int N, int d) {
     float t;
 
