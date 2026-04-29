@@ -11,8 +11,8 @@
 #define BLOCK_1D 256
 
 
-__global__ void compute_scores_kernel(const float* Q, const float* K, float*  S, int N, int d
-) {
+// Compute raw attention scores S = Q @ K^T / sqrt(d)
+__global__ void compute_scores_kernel(const float* Q, const float* K, float*  S, int N, int d) {
     int row = blockIdx.y * blockDim.y + threadIdx.y;
     int col = blockIdx.x * blockDim.x + threadIdx.x;
 
@@ -22,19 +22,22 @@ __global__ void compute_scores_kernel(const float* Q, const float* K, float*  S,
         return;
     }
 
+
     float scale = 1.0f / sqrtf((float)d);
     float sum = 0.0f;
 
+    // Compute dot product of Q[row] and K[col]
     for (int i = 0; i < d; i++)
     {
         sum += Q[row * d + i] * K[col * d + i];
     }
 
+    //
     S[row * N + col] = sum * scale;
 }
 
 
-
+// Compute softmax over each row of S to get P
 __global__ void softmax_kernel(const float* S,float* P,int N) {
     int row = blockIdx.x * blockDim.x + threadIdx.x;
 
@@ -77,6 +80,7 @@ __global__ void compute_output_kernel(const float* P, const float* V, float* O, 
         return;
     }
 
+    // compute dot product of P and V
     float sum = 0.0f;
     for (int j = 0; j < N; j++)
     {
@@ -102,20 +106,25 @@ void naive_attention(const float* d_Q, const float* d_K, const float* d_V, float
     cudaEventCreate(&stop);
 
 
+    // launch configuration for scores and output
     dim3 block2d(BLOCK, BLOCK);
     dim3 grid_scores((N + BLOCK - 1) / BLOCK,(N + BLOCK - 1) / BLOCK);
 
 
+    // launch configuration for softmax
     dim3 block1d(BLOCK_1D);
     dim3 grid_softmax((N + BLOCK_1D - 1) / BLOCK_1D);
 
 
+    // launch configuration for output
     dim3 grid_output((d + BLOCK - 1) / BLOCK,(N + BLOCK - 1) / BLOCK);
 
 
     // Time all three kernels together
     cudaEventRecord(start);
 
+
+    // launch kernels
     compute_scores_kernel<<<grid_scores, block2d>>>(d_Q, d_K, d_S, N, d);
     softmax_kernel<<<grid_softmax, block1d>>>(d_S, d_P, N);
     compute_output_kernel<<<grid_output, block2d>>>(d_P, d_V, d_O, N, d);

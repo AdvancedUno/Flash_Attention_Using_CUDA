@@ -1,5 +1,7 @@
+// attention.cuh
 #pragma once
 
+// naive attention kernel
 void naive_attention(
     const float* d_Q,
     const float* d_K,
@@ -10,7 +12,7 @@ void naive_attention(
     float* time_ms
 );
 
-
+// flash attention kernel
 void flash_attention(
     const float* d_Q,
     const float* d_K,

@@ -1,3 +1,4 @@
+// main.cu
 #include <stdio.h>
 #include <stdlib.h>
 #include <cuda_runtime.h>
@@ -11,23 +12,30 @@
 #define WARMUP_RUNS 3
 #define TIMED_RUNS 10
 
+// Function pointer type for attention kernels
 typedef void (*AttnFn)(const float*, const float*, const float*, float*, int, int, float*);
 
+
+// Benchmarking function that runs the given attention kernel multiple times and returns the average execution time in milliseconds
 float benchmark(AttnFn fn, const float* d_Q, const float* d_K, const float* d_V, float* d_O, int N, int d) {
+    
     float t;
 
 
+    // Warmup runs
     for (int i = 0; i < WARMUP_RUNS; i++)
     {
         fn(d_Q, d_K, d_V, d_O, N, d, &t);
     }
         
-
+    // Timed runs
     float total = 0.0f;
     for (int i = 0; i < TIMED_RUNS; i++) {
         fn(d_Q, d_K, d_V, d_O, N, d, &t);
         total += t;
     }
+
+
     return total / TIMED_RUNS;
 }
 
@@ -78,22 +86,16 @@ void run_comparison(int N, int d) {
     }
 
     // Memory traffic estimates
-    // Naive: reads Q,K writes S, reads S writes P, reads P,V writes O
-    double naive_mem = sizeof(float) * (2.0*N*d +       // read Q, K
-        N*N +           // write S
-        2.0*N*N +       // read S, write P
-        N*N + N*d +     // read P, V
-        N*d             // write O
-    );
-    // Flash: reads Q,K,V once each, writes O once — no N×N traffic
-    double flash_mem = sizeof(float) * (
-        3.0*N*d +       // read Q, K, V
-        N*d             // write O
-    );
+    // reads Q,K writes S, reads S writes P, reads P,V writes O
+    double naive_mem = sizeof(float) * (2.0*N*d + N*N + 2.0*N*N + N*N + N*d +N*d);
+
+    // reads Q,K,V once each, writes O once and no N×N traffic
+    double flash_mem = sizeof(float) * (3.0*N*d + N*d);
 
     // Benchmark
     float naive_ms = benchmark(naive_attention, d_Q, d_K, d_V, d_O, N, d);
     float flash_ms = benchmark(flash_attention, d_Q, d_K, d_V, d_O, N, d);
+    
 
     printf("  %-18s | %8s ms | %7s GFLOP/s | " "%7s GB/s | %6s FLOP/byte\n", "Kernel", "Time", "Compute", "Bandwidth", "Intensity");
     printf("  %-18s-+-%8s----+-%7s----------+-" "%7s------+-%6s-----------\n", "------------------","--------","-------","-------","------");

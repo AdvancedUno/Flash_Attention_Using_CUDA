@@ -1,3 +1,4 @@
+// flash_attention.cu
 #include <cuda_runtime.h>
 #include <math.h>
 #include "attention.cuh"
@@ -15,6 +16,7 @@ __global__ void flash_attention_kernel(const float* Q, const float* K, const flo
     __shared__ float V_tile[TILE_SIZE][D_MAX];
 
 
+    // register for query row and store Q values to avoid redundant global memory accesses
     float q_reg[D_MAX] = {};
     if (q_row < N)
     {
@@ -25,7 +27,7 @@ __global__ void flash_attention_kernel(const float* Q, const float* K, const flo
     }
 
 
-
+    // accumulators for output and softmax normalization
     float O_acc[D_MAX] = {};
     float m = -1e9f;
     float l = 0.0f;
@@ -33,10 +35,12 @@ __global__ void flash_attention_kernel(const float* Q, const float* K, const flo
     float scale = 1.0f / sqrtf((float)d);
 
 
+    // number of tiles needed to cover K and V
     int num_tiles = (N + TILE_SIZE - 1) / TILE_SIZE;
 
 
 
+    // loop over tiles of K and V
     for (int tile = 0; tile < num_tiles; tile++) {
 
         int kv_row = tile * TILE_SIZE + threadIdx.x;
@@ -61,6 +65,7 @@ __global__ void flash_attention_kernel(const float* Q, const float* K, const flo
         __syncthreads();
 
 
+        // load V tile with same indices as K tile
         if (threadIdx.x < TILE_SIZE && kv_row < N) 
         {
             for (int i = 0; i < d; i++)
@@ -135,6 +140,7 @@ __global__ void flash_attention_kernel(const float* Q, const float* K, const flo
     }
     
 
+    // write output for this query row
     if (q_row < N) 
     {
         for (int i = 0; i < d; i++)
@@ -148,14 +154,20 @@ __global__ void flash_attention_kernel(const float* Q, const float* K, const flo
 
 
 void flash_attention(const float* d_Q, const float* d_K, const float* d_V, float* d_O, int N, int d, float* time_ms) {
+
+    // launch configuration
     dim3 block(TILE_SIZE);
     dim3 grid((N + TILE_SIZE - 1) / TILE_SIZE);
 
+
+    // timing with CUDA events
     cudaEvent_t start, stop;
     cudaEventCreate(&start);
     cudaEventCreate(&stop);
 
+
     cudaEventRecord(start);
+    // launch kernel
     flash_attention_kernel<<<grid, block>>>(d_Q, d_K, d_V, d_O, N, d);
     cudaEventRecord(stop);
     cudaEventSynchronize(stop);

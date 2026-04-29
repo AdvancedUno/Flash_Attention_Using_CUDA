@@ -1,3 +1,4 @@
+// validate.cuh
 #pragma once
 #include <math.h>
 #include <stdio.h>
@@ -63,6 +64,7 @@ void cpu_attention(float* Q, float* K, float* V, float* O, int N, int d) {
 }
 
 
+// Compute max absolute error between two arrays
 inline float max_abs_error(float* A, float* B, int N, int d) {
     float max_err = 0.0f;
     for (int i = 0; i < N * d; i++)
